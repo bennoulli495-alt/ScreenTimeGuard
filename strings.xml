@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Screen Time Guard</string>
+    <string name="notif_channel_name">Screen Time Guard Active</string>
+    <string name="notif_title">Screen Time Guard is running</string>
+    <string name="notif_text">Monitoring restricted hours</string>
+    <string name="lock_title">App Locked</string>
+    <string name="lock_subtitle">This app is restricted right now.</string>
+    <string name="hint_password">Enter password</string>
+    <string name="btn_unlock">Unlock</string>
+    <string name="error_wrong_password">Incorrect password</string>
+</resources>

@@ -1,0 +1,8 @@
+<resources>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="primary">#FF3F51B5</color>
+    <color name="primary_dark">#FF303F9F</color>
+    <color name="grey_text">#FF555555</color>
+    <color name="error_red">#FFD32F2F</color>
+</resources>
