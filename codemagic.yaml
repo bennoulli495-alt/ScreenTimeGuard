@@ -12,15 +12,14 @@ workflows:
           #!/usr/bin/env bash
           set -e
 
-          # If the repo already has a proper app/ folder with build.gradle,
-          # the project was pushed with structure intact (e.g. via git CLI
-          # or a folder drag-and-drop) and no reorganization is needed.
-          if [ -f "app/build.gradle" ]; then
-            echo "Project structure already intact, skipping reorganization."
-            exit 0
-          fi
-
-          echo "Flat upload detected - reconstructing project structure..."
+          # NOTE: this reorganization step always runs (it does not exit
+          # early even when app/build.gradle already exists), so any newly
+          # uploaded file dropped flat at the repo root — via GitHub's
+          # drag-and-drop "Upload files" — is picked up and relocated on
+          # every build, not just the first one. The move() function below
+          # is safe to re-run: it skips a file that is already sitting in
+          # its correct destination.
+          echo "Reconciling project structure..."
 
           mkdir -p app/src/main/java/com/familyguard/screentime/{util,data,receiver,scheduler,service,ui}
           mkdir -p app/src/main/res/{values,xml,layout,drawable,mipmap-anydpi-v26}
@@ -87,6 +86,9 @@ workflows:
           move "SettingsActivity.kt" "$JAVA_DIR/ui/SettingsActivity.kt"
           move "SettingsViewModel.kt" "$JAVA_DIR/ui/SettingsViewModel.kt"
           move "AppListAdapter.kt" "$JAVA_DIR/ui/AppListAdapter.kt"
+          move "AppSelectionActivity.kt" "$JAVA_DIR/ui/AppSelectionActivity.kt"
+          move "PasswordActivity.kt" "$JAVA_DIR/ui/PasswordActivity.kt"
+          move "RecoveryQuestionActivity.kt" "$JAVA_DIR/ui/RecoveryQuestionActivity.kt"
 
           move "strings.xml" "$RES_DIR/values/strings.xml"
           move "colors.xml" "$RES_DIR/values/colors.xml"
@@ -95,11 +97,22 @@ workflows:
           move "activity_settings.xml" "$RES_DIR/layout/activity_settings.xml"
           move "overlay_lock_screen.xml" "$RES_DIR/layout/overlay_lock_screen.xml"
           move "item_app.xml" "$RES_DIR/layout/item_app.xml"
+          move "activity_app_selection.xml" "$RES_DIR/layout/activity_app_selection.xml"
+          move "activity_password.xml" "$RES_DIR/layout/activity_password.xml"
+          move "activity_recovery_question.xml" "$RES_DIR/layout/activity_recovery_question.xml"
           move "ic_launcher_background.xml" "$RES_DIR/drawable/ic_launcher_background.xml"
           move "ic_launcher_foreground.xml" "$RES_DIR/drawable/ic_launcher_foreground.xml"
           move "ic_launcher.xml" "$RES_DIR/mipmap-anydpi-v26/ic_launcher.xml"
 
-          move "build.gradle" "app/build.gradle" # app-level; overwritten below if root also flat
+          # build.gradle is a special case: identical filenames exist at the
+          # repo root (project-level) and inside app/ (module-level). Only
+          # attempt to relocate a root-level duplicate into app/build.gradle
+          # the first time app/build.gradle doesn't exist yet — once it's in
+          # place, re-running this on every build must NOT overwrite it with
+          # whichever "build.gradle" happens to still be sitting at root.
+          if [ ! -f "app/build.gradle" ]; then
+            move "build.gradle" "app/build.gradle"
+          fi
           move "settings.gradle" "settings.gradle"
           move "gradle.properties" "gradle.properties"
           move "proguard-rules.pro" "app/proguard-rules.pro"
