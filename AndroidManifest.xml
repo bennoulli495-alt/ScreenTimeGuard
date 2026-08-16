@@ -38,6 +38,24 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.AppSelectionActivity"
+            android:exported="false"
+            android:label="Select Apps to Restrict"
+            android:parentActivityName=".ui.SettingsActivity" />
+
+        <activity
+            android:name=".ui.PasswordActivity"
+            android:exported="false"
+            android:label="Admin Password"
+            android:parentActivityName=".ui.SettingsActivity" />
+
+        <activity
+            android:name=".ui.RecoveryQuestionActivity"
+            android:exported="false"
+            android:label="Recover Password"
+            android:parentActivityName=".ui.PasswordActivity" />
+
         <!-- Foreground service that watches the current foreground app -->
         <service
             android:name=".service.AppMonitorService"

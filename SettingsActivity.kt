@@ -22,8 +22,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.familyguard.screentime.R
 import com.familyguard.screentime.receiver.MyDeviceAdminReceiver
 import com.familyguard.screentime.scheduler.AlarmScheduler
@@ -32,7 +30,6 @@ import com.familyguard.screentime.service.AppMonitorService
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var viewModel: SettingsViewModel
-    private lateinit var adapter: AppListAdapter
     private lateinit var devicePolicyManager: DevicePolicyManager
     private lateinit var adminComponent: ComponentName
 
@@ -42,11 +39,12 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var btnIgnoreBattery: Button
     private lateinit var btnStartTime: Button
     private lateinit var btnEndTime: Button
-    private lateinit var editPassword: EditText
-    private lateinit var btnSavePassword: Button
+    private lateinit var btnPasswordScreen: Button
+    private lateinit var textPasswordStatus: TextView
     private lateinit var switchSkipNext: Switch
     private lateinit var switchBlockSettings: Switch
-    private lateinit var recyclerApps: RecyclerView
+    private lateinit var btnSelectApps: Button
+    private lateinit var textSelectedAppsSummary: TextView
     private lateinit var btnStartService: Button
     private lateinit var textStatus: TextView
 
@@ -73,6 +71,8 @@ class SettingsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshPermissionStatusUi()
+        updateSelectedAppsSummary()
+        updatePasswordStatus()
     }
 
     private fun bindViews() {
@@ -82,11 +82,12 @@ class SettingsActivity : AppCompatActivity() {
         btnIgnoreBattery = findViewById(R.id.btnIgnoreBattery)
         btnStartTime = findViewById(R.id.btnStartTime)
         btnEndTime = findViewById(R.id.btnEndTime)
-        editPassword = findViewById(R.id.editPassword)
-        btnSavePassword = findViewById(R.id.btnSavePassword)
+        btnPasswordScreen = findViewById(R.id.btnPasswordScreen)
+        textPasswordStatus = findViewById(R.id.textPasswordStatus)
         switchSkipNext = findViewById(R.id.switchSkipNext)
         switchBlockSettings = findViewById(R.id.switchBlockSettings)
-        recyclerApps = findViewById(R.id.recyclerApps)
+        btnSelectApps = findViewById(R.id.btnSelectApps)
+        textSelectedAppsSummary = findViewById(R.id.textSelectedAppsSummary)
         btnStartService = findViewById(R.id.btnStartService)
         textStatus = findViewById(R.id.textStatus)
     }
@@ -104,15 +105,22 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupAppList() {
-        adapter = AppListAdapter(mutableListOf())
-        recyclerApps.layoutManager = LinearLayoutManager(this)
-        recyclerApps.adapter = adapter
+        updateSelectedAppsSummary()
+    }
 
-        viewModel.apps.observe(this) { apps ->
-            adapter = AppListAdapter(apps.toMutableList())
-            recyclerApps.adapter = adapter
+    private fun updateSelectedAppsSummary() {
+        val count = viewModel.repository.storage.lockedPackages.size
+        textSelectedAppsSummary.text = if (count == 0) {
+            "No apps selected yet"
+        } else {
+            "$count app(s) selected"
         }
-        viewModel.loadApps()
+    }
+
+    private fun updatePasswordStatus() {
+        val hasPassword = viewModel.repository.storage.hasPasswordSet()
+        btnPasswordScreen.text = if (hasPassword) "Change Password" else "Set Admin Password"
+        textPasswordStatus.text = if (hasPassword) "Password is set" else "No password set yet"
     }
 
     private fun setupListeners() {
@@ -137,15 +145,8 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        btnSavePassword.setOnClickListener {
-            val pwd = editPassword.text.toString()
-            if (pwd.length < 4) {
-                Toast.makeText(this, "Password must be at least 4 characters", Toast.LENGTH_SHORT).show()
-            } else {
-                viewModel.savePassword(pwd)
-                editPassword.text.clear()
-                Toast.makeText(this, "Password saved", Toast.LENGTH_SHORT).show()
-            }
+        btnPasswordScreen.setOnClickListener {
+            startActivity(Intent(this, PasswordActivity::class.java))
         }
 
         switchSkipNext.setOnCheckedChangeListener { _, isChecked ->
@@ -154,6 +155,10 @@ class SettingsActivity : AppCompatActivity() {
 
         switchBlockSettings.setOnCheckedChangeListener { _, isChecked ->
             viewModel.setBlockSettingsApp(isChecked)
+        }
+
+        btnSelectApps.setOnClickListener {
+            startActivity(Intent(this, AppSelectionActivity::class.java))
         }
 
         btnStartService.setOnClickListener { validateAndStart() }
@@ -270,7 +275,7 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
 
-        val selected = adapter.selectedPackages()
+        val selected = viewModel.repository.storage.lockedPackages
         if (selected.isEmpty() && !switchBlockSettings.isChecked) {
             AlertDialog.Builder(this)
                 .setTitle("No apps selected")
@@ -279,7 +284,6 @@ class SettingsActivity : AppCompatActivity() {
                 .show()
             return
         }
-        viewModel.saveSelectedApps(selected)
 
         val serviceIntent = Intent(this, AppMonitorService::class.java)
         ContextCompat.startForegroundService(this, serviceIntent)

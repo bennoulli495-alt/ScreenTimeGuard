@@ -38,4 +38,15 @@ object Constants {
     const val ALARM_ACTION_LOCK = "com.familyguard.screentime.ACTION_LOCK_WINDOW_START"
 
     const val OVERLAY_UNLOCK_ACTION = "com.familyguard.screentime.ACTION_UNLOCKED"
+
+    // Fixed recovery question shown on the "Forgot password" screen. The
+    // correct answer is never stored as plaintext — only its SHA-256 hash
+    // (of the trimmed, lower-cased answer) is kept here, so reading the
+    // source or a decompiled APK doesn't reveal the answer directly.
+    const val RECOVERY_QUESTION =
+        "ScreenTimeGuard ကို ဒီနာမည်မပေးခင်က ဘယ်နာမည်နဲ့ ခေါ်ခဲ့လဲ?"
+    const val RECOVERY_ANSWER_HASH =
+        "0d6e8cdd4c7331d0a2dff887d2c607b454d21596d804fccba29cc5bb4b6db7be"
+
+    const val EXTRA_SKIP_CURRENT_PASSWORD_CHECK = "extra_skip_current_password_check"
 }

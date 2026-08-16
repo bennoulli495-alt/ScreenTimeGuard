@@ -18,4 +18,12 @@ object PasswordUtils {
         if (storedHash.isNullOrEmpty()) return false
         return hash(plainText) == storedHash
     }
+
+    /**
+     * Normalizes free-text answers (trims and lower-cases) before hashing,
+     * so recovery-question answers aren't rejected over capitalization or
+     * stray whitespace.
+     */
+    fun normalizedHash(rawAnswer: String): String =
+        hash(rawAnswer.trim().lowercase())
 }
