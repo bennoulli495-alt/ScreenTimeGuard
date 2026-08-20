@@ -41,8 +41,7 @@
         <activity
             android:name=".ui.AppSelectionActivity"
             android:exported="false"
-            android:label="Select Apps to Restrict"
-            android:parentActivityName=".ui.SettingsActivity" />
+            android:label="Select Apps to Restrict" />
 
         <activity
             android:name=".ui.PasswordActivity"
@@ -55,6 +54,24 @@
             android:exported="false"
             android:label="Recover Password"
             android:parentActivityName=".ui.PasswordActivity" />
+
+        <activity
+            android:name=".ui.PermissionsActivity"
+            android:exported="false"
+            android:label="Required Permissions"
+            android:parentActivityName=".ui.SettingsActivity" />
+
+        <activity
+            android:name=".ui.ScheduleListActivity"
+            android:exported="false"
+            android:label="Schedules"
+            android:parentActivityName=".ui.SettingsActivity" />
+
+        <activity
+            android:name=".ui.ScheduleEditActivity"
+            android:exported="false"
+            android:label="Edit Schedule"
+            android:parentActivityName=".ui.ScheduleListActivity" />
 
         <!-- Foreground service that watches the current foreground app -->
         <service
@@ -77,8 +94,9 @@
             </intent-filter>
         </receiver>
 
-        <!-- Handles the daily AlarmManager trigger: locks/unlocks the session,
-             and consumes the "skip next session" flag -->
+        <!-- Fires once daily at midnight to clear each schedule's
+             "unlocked for today" state. This is the only alarm the app
+             ever registers, regardless of how many schedules exist. -->
         <receiver
             android:name=".receiver.DailyResetReceiver"
             android:exported="false" />

@@ -20,8 +20,8 @@ class BootReceiver : BroadcastReceiver() {
         val storage = PreferenceStorage(context)
         if (!storage.monitoringEnabled) return
 
-        // Re-arm the daily lock/unlock alarm.
-        AlarmScheduler.scheduleNextTrigger(context)
+        // Re-arm the daily midnight unlock-reset alarm.
+        AlarmScheduler.scheduleNextMidnightReset(context)
 
         // Restart the foreground monitor service.
         val serviceIntent = Intent(context, AppMonitorService::class.java)

@@ -1,11 +1,12 @@
 package com.familyguard.screentime.ui
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.Button
 import android.widget.EditText
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -13,11 +14,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.familyguard.screentime.R
 import com.familyguard.screentime.data.AppInfo
 import com.familyguard.screentime.data.AppRepository
+import com.familyguard.screentime.util.Constants
 
 /**
- * Standalone screen for choosing which apps are subject to the restricted
- * window. Kept separate from SettingsActivity so the main settings screen
- * stays short; selections are written straight to shared storage on save.
+ * Standalone, schedule-agnostic screen for picking a set of apps. The caller
+ * (ScheduleEditActivity) passes in the currently-selected packages and
+ * receives the new selection back as an activity result — this screen never
+ * touches storage directly, so it works equally well for a brand-new,
+ * not-yet-saved schedule as for an existing one.
  */
 class AppSelectionActivity : AppCompatActivity() {
 
@@ -27,13 +31,15 @@ class AppSelectionActivity : AppCompatActivity() {
     private lateinit var btnSaveSelection: Button
 
     private var allApps: List<AppInfo> = emptyList()
-    private lateinit var adapter: AppListAdapter
+    private val selectedPackages: MutableSet<String> = mutableSetOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_app_selection)
 
         repository = AppRepository(this)
+        val preSelected = intent.getStringArrayExtra(Constants.EXTRA_PRESELECTED_PACKAGES)?.toSet() ?: emptySet()
+        selectedPackages.addAll(preSelected)
 
         setSupportActionBar(findViewById<Toolbar>(R.id.toolbar))
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -44,9 +50,8 @@ class AppSelectionActivity : AppCompatActivity() {
 
         recyclerApps.layoutManager = LinearLayoutManager(this)
 
-        allApps = repository.getInstallableApps()
-        adapter = AppListAdapter(allApps.toMutableList())
-        recyclerApps.adapter = adapter
+        allApps = repository.getInstallableApps(preSelected)
+        recyclerApps.adapter = AppListAdapter(allApps, selectedPackages)
 
         editSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -57,19 +62,10 @@ class AppSelectionActivity : AppCompatActivity() {
         })
 
         btnSaveSelection.setOnClickListener {
-            // Merge newly-checked/unchecked state from the adapter's current
-            // (possibly filtered) list back into the full app list before saving,
-            // so selections made before a search filter are not lost.
-            val currentSelections = adapter.selectedPackages()
-            val previousSelections = repository.storage.lockedPackages
-            val visiblePackages = allApps.map { it.packageName }.toSet()
-
-            // Packages outside the currently-loaded list (there shouldn't be any,
-            // but this keeps the merge safe) are preserved as-is.
-            val merged = (previousSelections - visiblePackages) + currentSelections
-
-            repository.saveSelectedApps(merged)
-            Toast.makeText(this, "${merged.size} app(s) selected", Toast.LENGTH_SHORT).show()
+            val resultIntent = Intent().apply {
+                putExtra(Constants.EXTRA_RESULT_SELECTED_PACKAGES, selectedPackages.toTypedArray())
+            }
+            setResult(Activity.RESULT_OK, resultIntent)
             finish()
         }
     }
@@ -80,11 +76,7 @@ class AppSelectionActivity : AppCompatActivity() {
         } else {
             allApps.filter { it.label.contains(query, ignoreCase = true) }
         }
-        // Preserve any in-progress check changes made before filtering.
-        val currentSelections = adapter.selectedPackages()
-        val refreshed = filtered.map { it.copy(isSelected = it.packageName in currentSelections) }
-        adapter = AppListAdapter(refreshed.toMutableList())
-        recyclerApps.adapter = adapter
+        recyclerApps.adapter = AppListAdapter(filtered, selectedPackages)
     }
 
     override fun onSupportNavigateUp(): Boolean {

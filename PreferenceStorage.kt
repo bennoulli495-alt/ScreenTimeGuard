@@ -8,7 +8,10 @@ import com.familyguard.screentime.util.PasswordUtils
 /**
  * Single source of truth for all persisted configuration and session state.
  * Backed by SharedPreferences (synchronous reads, required by the polling
- * loop in AppMonitorService).
+ * loop in AppMonitorService). Schedules are stored as a JSON array under one
+ * key; each Schedule carries its own id, time range, repeat days, restricted
+ * apps and enabled flag, so add/edit/delete/enable operations never disturb
+ * any other schedule.
  */
 class PreferenceStorage(context: Context) {
 
@@ -28,38 +31,69 @@ class PreferenceStorage(context: Context) {
         return PasswordUtils.matches(candidate, storedHash)
     }
 
-    // ---------- Time window ----------
+    // ---------- Schedules ----------
 
-    var startHour: Int
-        get() = prefs.getInt(Constants.KEY_START_HOUR, Constants.DEFAULT_START_HOUR)
-        set(value) = prefs.edit().putInt(Constants.KEY_START_HOUR, value).apply()
+    fun getSchedules(): MutableList<Schedule> =
+        ScheduleSerializer.listFromJson(prefs.getString(Constants.KEY_SCHEDULES_JSON, null))
 
-    var startMinute: Int
-        get() = prefs.getInt(Constants.KEY_START_MINUTE, Constants.DEFAULT_START_MINUTE)
-        set(value) = prefs.edit().putInt(Constants.KEY_START_MINUTE, value).apply()
+    private fun saveSchedules(schedules: List<Schedule>) {
+        prefs.edit().putString(Constants.KEY_SCHEDULES_JSON, ScheduleSerializer.listToJson(schedules)).apply()
+    }
 
-    var endHour: Int
-        get() = prefs.getInt(Constants.KEY_END_HOUR, Constants.DEFAULT_END_HOUR)
-        set(value) = prefs.edit().putInt(Constants.KEY_END_HOUR, value).apply()
+    fun getSchedule(id: String): Schedule? = getSchedules().find { it.id == id }
 
-    var endMinute: Int
-        get() = prefs.getInt(Constants.KEY_END_MINUTE, Constants.DEFAULT_END_MINUTE)
-        set(value) = prefs.edit().putInt(Constants.KEY_END_MINUTE, value).apply()
+    fun addSchedule(schedule: Schedule) {
+        val list = getSchedules()
+        list.add(schedule)
+        saveSchedules(list)
+    }
 
-    // ---------- Session flags ----------
+    /** Replaces the schedule with the same id. Every other schedule is left untouched. */
+    fun updateSchedule(updated: Schedule) {
+        val list = getSchedules()
+        val index = list.indexOfFirst { it.id == updated.id }
+        if (index >= 0) {
+            list[index] = updated
+        } else {
+            list.add(updated)
+        }
+        saveSchedules(list)
+    }
 
-    var isUnlockedToday: Boolean
-        get() = prefs.getBoolean(Constants.KEY_IS_UNLOCKED_TODAY, false)
-        set(value) = prefs.edit().putBoolean(Constants.KEY_IS_UNLOCKED_TODAY, value).apply()
+    /** Deletes only the given schedule and its unlock state. Every other schedule is unaffected. */
+    fun deleteSchedule(id: String) {
+        val list = getSchedules()
+        list.removeAll { it.id == id }
+        saveSchedules(list)
 
-    var skipNextSession: Boolean
-        get() = prefs.getBoolean(Constants.KEY_SKIP_NEXT_SESSION, false)
-        set(value) = prefs.edit().putBoolean(Constants.KEY_SKIP_NEXT_SESSION, value).apply()
+        val unlocked = unlockedScheduleIds.toMutableSet()
+        if (unlocked.remove(id)) {
+            unlockedScheduleIds = unlocked
+        }
+    }
 
-    /** True only for the one day a "skip" was consumed; cleared at the next window start. */
-    var skippedToday: Boolean
-        get() = prefs.getBoolean(Constants.KEY_SKIPPED_TODAY, false)
-        set(value) = prefs.edit().putBoolean(Constants.KEY_SKIPPED_TODAY, value).apply()
+    fun setScheduleEnabled(id: String, enabled: Boolean) {
+        val list = getSchedules()
+        val index = list.indexOfFirst { it.id == id }
+        if (index >= 0) {
+            list[index] = list[index].copy(enabled = enabled)
+            saveSchedules(list)
+        }
+    }
+
+    // ---------- Per-schedule daily unlock state ----------
+
+    /** Schedule IDs unlocked for the remainder of today. Cleared at midnight. */
+    var unlockedScheduleIds: Set<String>
+        get() = prefs.getStringSet(Constants.KEY_UNLOCKED_SCHEDULE_IDS, emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet(Constants.KEY_UNLOCKED_SCHEDULE_IDS, value).apply()
+
+    fun markScheduleUnlockedForToday(scheduleId: String) {
+        unlockedScheduleIds = unlockedScheduleIds + scheduleId
+    }
+
+    fun isScheduleUnlockedToday(scheduleId: String): Boolean =
+        scheduleId in unlockedScheduleIds
 
     var lastResetDayOfYear: Int
         get() = prefs.getInt(Constants.KEY_LAST_RESET_DAY, -1)
@@ -69,20 +103,9 @@ class PreferenceStorage(context: Context) {
         get() = prefs.getBoolean(Constants.KEY_MONITORING_ENABLED, false)
         set(value) = prefs.edit().putBoolean(Constants.KEY_MONITORING_ENABLED, value).apply()
 
-    // ---------- Locked apps ----------
-
-    var lockedPackages: Set<String>
-        get() = prefs.getStringSet(Constants.KEY_LOCKED_PACKAGES, emptySet()) ?: emptySet()
-        set(value) = prefs.edit().putStringSet(Constants.KEY_LOCKED_PACKAGES, value).apply()
+    // ---------- Global options ----------
 
     var blockSettingsApp: Boolean
         get() = prefs.getBoolean(Constants.KEY_BLOCK_SETTINGS, false)
         set(value) = prefs.edit().putBoolean(Constants.KEY_BLOCK_SETTINGS, value).apply()
-
-    /** The full set of packages currently subject to restriction. */
-    fun effectiveLockedPackages(): Set<String> {
-        val set = lockedPackages.toMutableSet()
-        if (blockSettingsApp) set.add(Constants.SETTINGS_PACKAGE)
-        return set
-    }
 }

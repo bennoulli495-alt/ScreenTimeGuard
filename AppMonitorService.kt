@@ -57,7 +57,7 @@ class AppMonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundWithNotification()
         repository.storage.monitoringEnabled = true
-        AlarmScheduler.scheduleNextTrigger(this)
+        AlarmScheduler.scheduleNextMidnightReset(this)
 
         handler.removeCallbacks(pollRunnable)
         handler.post(pollRunnable)
@@ -87,8 +87,9 @@ class AppMonitorService : Service() {
         lastCheckedPackage = foregroundPackage
 
         val now = Calendar.getInstance()
-        if (repository.shouldBlock(foregroundPackage, now)) {
-            overlayManager.show()
+        val blockingSchedule = repository.findBlockingSchedule(foregroundPackage, now)
+        if (blockingSchedule != null) {
+            overlayManager.show(blockingSchedule)
         } else if (overlayManager.isShowing) {
             // The user navigated away from the locked app on their own,
             // e.g. pressed Home. Hide the overlay so it doesn't cover

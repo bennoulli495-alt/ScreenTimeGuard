@@ -9,12 +9,16 @@ import androidx.recyclerview.widget.RecyclerView
 import com.familyguard.screentime.R
 import com.familyguard.screentime.data.AppInfo
 
+/**
+ * Selection state lives in [selectedPackages], owned by the caller, NOT in
+ * the AppInfo items themselves. This way, filtering the visible list (e.g.
+ * via search) never loses a selection made on an item that's since been
+ * scrolled or filtered out of view.
+ */
 class AppListAdapter(
-    private val apps: MutableList<AppInfo>
+    private val apps: List<AppInfo>,
+    private val selectedPackages: MutableSet<String>
 ) : RecyclerView.Adapter<AppListAdapter.AppViewHolder>() {
-
-    fun selectedPackages(): Set<String> =
-        apps.filter { it.isSelected }.map { it.packageName }.toSet()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
@@ -36,11 +40,10 @@ class AppListAdapter(
             icon.setImageDrawable(app.icon)
             name.text = app.label
 
-            // Avoid firing the listener while RecyclerView recycles views.
             checkbox.setOnCheckedChangeListener(null)
-            checkbox.isChecked = app.isSelected
+            checkbox.isChecked = app.packageName in selectedPackages
             checkbox.setOnCheckedChangeListener { _, isChecked ->
-                app.isSelected = isChecked
+                if (isChecked) selectedPackages.add(app.packageName) else selectedPackages.remove(app.packageName)
             }
 
             itemView.setOnClickListener {

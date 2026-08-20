@@ -4,13 +4,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import com.familyguard.screentime.util.Constants
 import java.util.Calendar
 
 /**
  * Central repository the rest of the app talks to. Wraps PreferenceStorage
- * and adds the derived logic (is it currently inside the restricted window,
- * is a given package currently locked, etc.) so that Activities, the Service
- * and the Receivers all share one consistent decision path.
+ * and adds the derived logic used by the UI, the foreground service, and
+ * the receivers: which schedule(s) currently apply to a given app, and
+ * whether a password unlocks the correct one.
  */
 class AppRepository(context: Context) {
 
@@ -18,51 +19,44 @@ class AppRepository(context: Context) {
     private val packageManager: PackageManager = appContext.packageManager
     val storage = PreferenceStorage(appContext)
 
-    // ---------- Time window logic ----------
+    // ---------- Schedule matching ----------
 
-    fun isWithinRestrictedWindow(now: Calendar = Calendar.getInstance()): Boolean {
-        val nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
-        val startMinutes = storage.startHour * 60 + storage.startMinute
-        val endMinutes = storage.endHour * 60 + storage.endMinute
+    /**
+     * Returns the first enabled, currently-active schedule that restricts
+     * [packageName] and hasn't been unlocked for today, or null if the app
+     * should not be blocked right now. If more than one schedule matches
+     * (overlapping schedules), the earliest-created one in the stored list
+     * wins — deterministic, never crashes.
+     */
+    fun findBlockingSchedule(packageName: String, now: Calendar = Calendar.getInstance()): Schedule? {
+        if (packageName == appContext.packageName) return null // never lock ourselves
+        if (!storage.monitoringEnabled) return null
 
-        return if (startMinutes <= endMinutes) {
-            nowMinutes in startMinutes until endMinutes
-        } else {
-            // Window wraps past midnight, e.g. 22:00 - 02:00
-            nowMinutes >= startMinutes || nowMinutes < endMinutes
+        val settingsAlsoBlocked = storage.blockSettingsApp && packageName == Constants.SETTINGS_PACKAGE
+
+        return storage.getSchedules().firstOrNull { schedule ->
+            schedule.enabled &&
+                !storage.isScheduleUnlockedToday(schedule.id) &&
+                (packageName in schedule.restrictedPackages || settingsAlsoBlocked) &&
+                schedule.isActiveAt(now)
         }
     }
 
-    /**
-     * Whether the given foreground package should currently show the lock overlay.
-     * True only if: it's a targeted package, we are inside the time window,
-     * today's session has not been unlocked, and today was not "skipped".
-     */
-    fun shouldBlock(packageName: String, now: Calendar = Calendar.getInstance()): Boolean {
-        if (packageName == appContext.packageName) return false // never lock ourselves
-        if (!storage.monitoringEnabled) return false
-        if (storage.isUnlockedToday) return false
-        if (storage.skippedToday) return false
-        if (packageName !in storage.effectiveLockedPackages()) return false
-        return isWithinRestrictedWindow(now)
-    }
-
-    fun unlockSessionWithPassword(candidate: String): Boolean {
+    fun unlockScheduleWithPassword(scheduleId: String, candidate: String): Boolean {
         val correct = storage.verifyPassword(candidate)
         if (correct) {
-            storage.isUnlockedToday = true
+            storage.markScheduleUnlockedForToday(scheduleId)
         }
         return correct
     }
 
-    // ---------- Installed app listing ----------
+    // ---------- Installed app listing (used by AppSelectionActivity) ----------
 
-    fun getInstallableApps(): List<AppInfo> {
+    fun getInstallableApps(preSelected: Set<String>): List<AppInfo> {
         val launchableIntent = Intent(Intent.ACTION_MAIN, null).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
         }
         val resolvedApps = packageManager.queryIntentActivities(launchableIntent, 0)
-        val selected = storage.lockedPackages
 
         return resolvedApps
             .asSequence()
@@ -78,14 +72,10 @@ class AppRepository(context: Context) {
                     } catch (e: PackageManager.NameNotFoundException) {
                         null
                     },
-                    isSelected = appInfo.packageName in selected
+                    isSelected = appInfo.packageName in preSelected
                 )
             }
             .sortedBy { it.label.lowercase() }
             .toList()
-    }
-
-    fun saveSelectedApps(packages: Set<String>) {
-        storage.lockedPackages = packages
     }
 }

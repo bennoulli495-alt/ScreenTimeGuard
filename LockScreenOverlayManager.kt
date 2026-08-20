@@ -12,10 +12,13 @@ import android.widget.EditText
 import android.widget.TextView
 import com.familyguard.screentime.R
 import com.familyguard.screentime.data.AppRepository
+import com.familyguard.screentime.data.Schedule
 
 /**
  * Owns the lifecycle of the full-screen SYSTEM_ALERT_WINDOW overlay used to
- * block a restricted app. One instance lives inside AppMonitorService.
+ * block a restricted app. One instance lives inside AppMonitorService. A
+ * correct password unlocks only the specific schedule that is currently
+ * blocking, not every schedule.
  */
 class LockScreenOverlayManager(
     private val context: Context,
@@ -26,22 +29,30 @@ class LockScreenOverlayManager(
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: View? = null
 
+    /** The schedule currently being shown/enforced by the overlay, if any. */
+    var activeSchedule: Schedule? = null
+        private set
+
     val isShowing: Boolean
         get() = overlayView != null
 
-    fun show() {
+    fun show(schedule: Schedule) {
         if (overlayView != null) return // already showing
+        activeSchedule = schedule
 
         val inflater = LayoutInflater.from(context)
         val view = inflater.inflate(R.layout.overlay_lock_screen, null)
 
+        val textSubtitle = view.findViewById<TextView>(R.id.textLockSubtitle)
         val editPassword = view.findViewById<EditText>(R.id.editOverlayPassword)
         val textError = view.findViewById<TextView>(R.id.textOverlayError)
         val btnUnlock = view.findViewById<Button>(R.id.btnOverlayUnlock)
 
+        textSubtitle.text = "Restricted by schedule: ${schedule.name}"
+
         val attemptUnlock = {
             val candidate = editPassword.text.toString()
-            if (repository.unlockSessionWithPassword(candidate)) {
+            if (repository.unlockScheduleWithPassword(schedule.id, candidate)) {
                 textError.visibility = View.INVISIBLE
                 hide()
                 onUnlocked()
@@ -64,7 +75,7 @@ class LockScreenOverlayManager(
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        // Deliberately focusable (i.e. FLAG_NOT_FOCUSABLE is NOT set) so the
+        // Deliberately focusable (FLAG_NOT_FOCUSABLE is NOT set) so the
         // password EditText can receive keyboard input.
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -77,7 +88,6 @@ class LockScreenOverlayManager(
         windowManager.addView(view, params)
         overlayView = view
 
-        // Auto-focus the password field and raise the keyboard.
         editPassword.requestFocus()
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.showSoftInput(editPassword, InputMethodManager.SHOW_IMPLICIT)
@@ -89,5 +99,6 @@ class LockScreenOverlayManager(
         imm.hideSoftInputFromWindow(view.windowToken, 0)
         windowManager.removeView(view)
         overlayView = null
+        activeSchedule = null
     }
 }
