@@ -1,11 +1,11 @@
 <resources>
-    <string name="app_name">Screen Time Guard</string>
-    <string name="notif_channel_name">Screen Time Guard Active</string>
-    <string name="notif_title">Screen Time Guard is running</string>
-    <string name="notif_text">Monitoring restricted hours</string>
-    <string name="lock_title">App Locked</string>
-    <string name="lock_subtitle">This app is restricted right now.</string>
-    <string name="hint_password">Enter password</string>
+    <string name="app_name">ScreenTimeGuard</string>
+    <string name="notif_channel_name">....</string>
+    <string name="notif_title">......</string>
+    <string name="notif_text">......</string>
+    <string name="lock_title">🔒App Locked 🔒</string>
+    <string name="lock_subtitle">မင်းအချိန်ပြည့်သွားပီလေ။ ထပ်ကိုင်ချင်ရင် premium ဝယ်ရမယ်။ 5000 ကျမယ်။ အဲ့ပေးမယ့်ပိုက်ဆံကမင်းရဲ့လုပ်အားခကြောင့်ရထားတာဖြစ်ရမယ်။ </string>
+    <string name="hint_password">Password ထည့်</string>
     <string name="btn_unlock">Unlock</string>
-    <string name="error_wrong_password">Incorrect password</string>
+    <string name="error_wrong_password">Password သိချင်ရင်ထိုင်ဆုတောင်း အဲ့တာလည်းရမှာမဟုတ်ဘူး</string>
 </resources>
