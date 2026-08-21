@@ -27,7 +27,7 @@
         android:layout_marginTop="40dp"
         android:gravity="center"
         android:textColor="@color/grey_text"
-        android:text="No schedules yet. Tap &quot;+ Add Schedule&quot; to create one (e.g. School, Study, Sleep)."
+        android:text="No schedules yet. Tap \"+ Add Schedule\" to create one (e.g. School, Study, Sleep)."
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
